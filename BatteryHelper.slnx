@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BatteryHelper.Core/BatteryHelper.Core.csproj" />
+    <Project Path="src/BatteryHelper.Sensors/BatteryHelper.Sensors.csproj" />
+    <Project Path="src/BatteryHelper.Service/BatteryHelper.Service.csproj" />
+    <Project Path="src/BatteryHelper.App/BatteryHelper.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BatteryHelper.Tests/BatteryHelper.Tests.csproj" />
+  </Folder>
+</Solution>

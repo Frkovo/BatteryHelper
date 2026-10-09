@@ -1,0 +1,15 @@
+.tools/
+.vendor/
+artifacts/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.log
+.vs/
+TestResults/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12

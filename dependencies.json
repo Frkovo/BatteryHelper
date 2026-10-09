@@ -1,0 +1,9 @@
+{
+  "libreHardwareMonitor": {
+    "repository": "https://github.com/LibreHardwareMonitor/LibreHardwareMonitor",
+    "commit": "76150732c2df9241415eec216001bec4557c9033",
+    "license": "MPL-2.0",
+    "reason": "Includes Panther Lake (CPUID model 0xCC) power monitoring"
+  },
+  "dotnetSdk": "10.0.401"
+}

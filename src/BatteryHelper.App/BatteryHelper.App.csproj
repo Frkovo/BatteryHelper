@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>BatteryHelper</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\BatteryHelper.ico</ApplicationIcon>
+    <StartupObject>BatteryHelper.App.Program</StartupObject>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BatteryHelper.Sensors\BatteryHelper.Sensors.csproj" />
+    <Resource Include="Assets\BatteryHelper.ico" />
+  </ItemGroup>
+</Project>

@@ -4,7 +4,7 @@ BatteryHelper's original application, service, tests and build scripts are licen
 
 - LibreHardwareMonitor: MPL-2.0, https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
   - Pinned source: `76150732c2df9241415eec216001bec4557c9033`.
-  - Modifications: `patches/IntelMsr.cs` validates module availability and ioctl completion; `patches/IntelCpu.cs` and `patches/IntelIntegratedGpu.cs` clear failed/stale/reset power reads and reestablish counter baselines. Build targets are restricted to .NET 10 x64.
+  - Modifications: `patches/IntelMsr.cs` validates module availability and ioctl completion; `patches/IntelCpu.cs` and `patches/IntelIntegratedGpu.cs` clear failed/stale/reset power reads and reestablish counter baselines. The CPU Graphics RAPL PP1 sensor is also exposed on Windows, so the application can subtract a same-package integrated graphics domain. Build targets are restricted to .NET 10 x64.
   - `src/BatteryHelper.Sensors/Interop/IntelGcl.cs` is adapted from this source; changes are its namespace, nullable device-enumeration argument and secure System32 DLL probing.
   - The source release includes the upstream source archive and the modification sources. The installer includes the MPL license.
   - The repository includes the license in `licenses/LibreHardwareMonitor-MPL-2.0.txt` and preserves upstream dependency notices in `licenses/LibreHardwareMonitor-THIRD-PARTY-NOTICES.txt`.

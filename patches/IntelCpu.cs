@@ -497,9 +497,8 @@ internal sealed class IntelCpu : GenericCpu
                     if (!_pawnModule.ReadMsr(_energyStatusMsrs[i], out eax, out uint _))
                         continue;
 
-                    // Don't show the "GPU Graphics" sensor on windows, it will show up under the GPU instead.
-                    if (i == 2 && !Software.OperatingSystem.IsUnix)
-                        continue;
+                    // BatteryHelper needs this same-package PP1 domain on Windows too,
+                    // so CPU Package can exclude integrated graphics without subtracting a discrete GPU.
 
                     _lastEnergyTime[i] = DateTime.UtcNow;
                     _lastEnergyConsumed[i] = eax;

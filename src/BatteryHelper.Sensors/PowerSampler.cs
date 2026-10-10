@@ -12,9 +12,9 @@ public sealed class PowerSampler : IDisposable
     {
         var now = DateTimeOffset.UtcNow;
         var battery = _battery.Read(now);
-        var (cpu, gpu, input) = _hardware.Read(now);
+        var (cpu, gpu, input, package, integrated) = _hardware.Read(now);
         return new(now, battery.Presence, battery.Supply, battery.ExternalPower, battery.Percent,
-            battery.Power, input, cpu, gpu, battery.Reason);
+            battery.Power, input, cpu, gpu, battery.Reason, package, integrated);
     }
 
     public void Dispose() { _battery.Dispose(); _hardware.Dispose(); }

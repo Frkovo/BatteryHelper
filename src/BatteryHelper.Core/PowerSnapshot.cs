@@ -25,7 +25,8 @@ public sealed record PowerReading(double? Watts, string Source, string Coverage,
 public sealed record PowerSnapshot(DateTimeOffset SampledAt, BatteryPresence Battery,
     SupplyState Supply, bool? ExternalPower, double? BatteryPercent,
     PowerReading BatteryPower, PowerReading InputPower, PowerReading CpuPower,
-    PowerReading GpuPower, string? StateReason = null)
+    PowerReading GpuPower, string? StateReason = null,
+    PowerReading? CpuPackagePower = null, PowerReading? IntegratedGpuPower = null)
 {
     public static PowerSnapshot Empty(string reason) => new(DateTimeOffset.UtcNow,
         BatteryPresence.Unknown, SupplyState.Unknown, null, null,
@@ -39,7 +40,8 @@ public sealed record PowerSnapshot(DateTimeOffset SampledAt, BatteryPresence Bat
         BatteryPercent = now - SampledAt > TimeSpan.FromSeconds(5) ? null : BatteryPercent,
         StateReason = now - SampledAt > TimeSpan.FromSeconds(5) ? "采集连接已超过 5 秒未更新。" : StateReason,
         BatteryPower = BatteryPower.Fresh(now), InputPower = InputPower.Fresh(now),
-        CpuPower = CpuPower.Fresh(now), GpuPower = GpuPower.Fresh(now)
+        CpuPower = CpuPower.Fresh(now), GpuPower = GpuPower.Fresh(now),
+        CpuPackagePower = CpuPackagePower?.Fresh(now), IntegratedGpuPower = IntegratedGpuPower?.Fresh(now)
     };
 }
 

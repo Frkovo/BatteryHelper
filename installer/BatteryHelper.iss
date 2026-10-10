@@ -1,4 +1,4 @@
-#define AppVersion "1.0.1"
+#define AppVersion "1.0.2"
 #define PublishDir "..\artifacts\publish"
 [Setup]
 AppId={{8CB1112D-9CD0-42F9-A1EA-9172447020CC}

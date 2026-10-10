@@ -12,7 +12,8 @@ internal sealed class DetailsWindow : Window
     private readonly TextBlock _updated = new() { FontSize = 11 };
     private readonly PowerCard _input = new("整机输入", "电脑运行与电池充电的总输入");
     private readonly PowerCard _battery = new("电池", "电池自身充放电功率");
-    private readonly PowerCard _cpu = new("CPU", "处理器封装功率");
+    private readonly PowerCard _cpu = new("CPU", "已确认包含核显时，显示封装功率减去同一封装的核显域");
+    private readonly TextBlock _cpuBreakdown = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new(0, 4, 0, 0) };
     private readonly PowerCard _gpu = new("GPU", "图形处理器功率");
     private readonly ComboBox _corner = new() { Foreground = Brushes.Black, Background = Brushes.White };
     private readonly ComboBox _monitor = new() { Foreground = Brushes.Black, Background = Brushes.White };
@@ -39,7 +40,8 @@ internal sealed class DetailsWindow : Window
         heading.Children.Add(new TextBlock { Text = "BatteryHelper", FontSize = 25, FontWeight = FontWeights.SemiBold });
         heading.Children.Add(new TextBlock { Text = "实时查看功率，知道每一项读数来自哪里。", FontSize = 12, Margin = new(0, 6, 0, 0) });
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
-        var footer = new TextBlock { Text = "BatteryHelper 1.0  ·  本地采集  ·  每秒刷新", FontSize = 11, Margin = new(0, 18, 0, 0) };
+        var version = typeof(DetailsWindow).Assembly.GetName().Version?.ToString(3);
+        var footer = new TextBlock { Text = $"BatteryHelper {version}  ·  本地采集  ·  每秒刷新", FontSize = 11, Margin = new(0, 18, 0, 0) };
         footer.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         _tabs.SetResourceReference(Control.BackgroundProperty, "BackgroundBrush");
@@ -64,8 +66,10 @@ internal sealed class DetailsWindow : Window
         AddCard(grid, _input, 0, 0); AddCard(grid, _battery, 0, 1);
         AddCard(grid, _cpu, 1, 0); AddCard(grid, _gpu, 1, 1);
         panel.Children.Add(grid);
+        _cpuBreakdown.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        panel.Children.Add(_cpuBreakdown);
         var note = new TextBlock { Margin = new(0, 10, 0, 0), FontSize = 12, TextWrapping = TextWrapping.Wrap,
-            Text = "输入功率缺失时，小窗会改为展示电池充电功率。CPU 封装和 GPU 的测量范围可能重叠，各项读数独立展示。" };
+            Text = "输入功率缺失时展示电池充电功率。CPU 在确认包含核显后扣除同一封装的核显域；余值仍保留封装内其他组件。读数缺失时显示不可用，独显功率不会从 CPU 扣除。" };
         note.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush"); panel.Children.Add(note);
         return new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
@@ -141,6 +145,9 @@ internal sealed class DetailsWindow : Window
         _updated.Text = $"最近采样 {raw.SampledAt.ToLocalTime():HH:mm:ss}" + (sample.StateReason is { } reason ? $"  ·  {reason}" : "");
         _input.Update(sample.InputPower); _battery.Update(sample.BatteryPower);
         _cpu.Update(sample.CpuPower); _gpu.Update(sample.GpuPower);
+        _cpuBreakdown.Text = sample.CpuPackagePower is { } package && sample.IntegratedGpuPower is { } integrated
+            ? $"CPU 计算：封装 {PowerPresentation.Format(package)} − 核显 {PowerPresentation.Format(integrated)} = {PowerPresentation.Format(sample.CpuPower)}"
+            : "CPU 测量范围见卡片说明；此设备未提供可用于扣除的同封装核显域。";
     }
 
     private sealed record MonitorChoice(string? Device, string Label) { public override string ToString() => Label; }

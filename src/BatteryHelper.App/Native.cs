@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -28,7 +29,54 @@ internal static class Native
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] public static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
-    [DllImport("user32.dll", SetLastError = true)] public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint color, byte alpha, uint flags);
+    [StructLayout(LayoutKind.Sequential)] private struct SurfaceSize { public int Width, Height; }
+    [StructLayout(LayoutKind.Sequential, Pack = 1)] private struct Blend { public byte Operation, Flags, Alpha, Format; }
+    [StructLayout(LayoutKind.Sequential)] private struct BitmapHeader {
+        public uint Size; public int Width, Height; public ushort Planes, Bits;
+        public uint Compression, ImageSize; public int XPels, YPels; public uint ColorsUsed, ColorsImportant;
+    }
+    [DllImport("gdi32.dll", SetLastError = true)] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll", SetLastError = true)] private static extern IntPtr CreateDIBSection(IntPtr dc, ref BitmapHeader header, uint usage, out IntPtr bits, IntPtr section, uint offset);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr value);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool UpdateLayeredWindow(IntPtr window, IntPtr destinationDc, IntPtr position,
+        ref SurfaceSize size, IntPtr sourceDc, ref Point source, uint color, ref Blend blend, uint flags);
+    public readonly record struct AlphaSurface(int TransparentPixels, int PartialAlphaPixels, int OpaquePixels, Point HitPoint);
+    public static AlphaSurface PresentAlpha(IntPtr window, Bitmap bitmap)
+    {
+        var data = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+        byte[] pixels;
+        try {
+            pixels = new byte[bitmap.Width * bitmap.Height * 4];
+            for (var row = 0; row < bitmap.Height; row++)
+                Marshal.Copy(data.Scan0 + row * data.Stride, pixels, row * bitmap.Width * 4, bitmap.Width * 4);
+        } finally { bitmap.UnlockBits(data); }
+        var clear = 0; var partial = 0; var opaque = 0; var hit = Point.Empty;
+        for (var index = 3; index < pixels.Length; index += 4) {
+            if (pixels[index] == 0) clear++;
+            else if (pixels[index] < 255) partial++;
+            else { if (opaque == 0) hit = new((index / 4) % bitmap.Width, (index / 4) / bitmap.Width); opaque++; }
+        }
+        var dc = CreateCompatibleDC(IntPtr.Zero);
+        if (dc == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        IntPtr surface = IntPtr.Zero, previous = IntPtr.Zero;
+        try {
+            var header = new BitmapHeader { Size = (uint)Marshal.SizeOf<BitmapHeader>(), Width = bitmap.Width, Height = -bitmap.Height, Planes = 1, Bits = 32 };
+            surface = CreateDIBSection(dc, ref header, 0, out var bits, IntPtr.Zero, 0);
+            if (surface == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            Marshal.Copy(pixels, 0, bits, pixels.Length); previous = SelectObject(dc, surface);
+            var size = new SurfaceSize { Width = bitmap.Width, Height = bitmap.Height }; var origin = Point.Empty;
+            var blend = new Blend { Alpha = 255, Format = 1 }; // AC_SRC_OVER + premultiplied per-pixel alpha.
+            if (!UpdateLayeredWindow(window, IntPtr.Zero, IntPtr.Zero, ref size, dc, ref origin, 0, ref blend, 2))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return new(clear, partial, opaque, hit);
+        } finally {
+            if (previous != IntPtr.Zero) SelectObject(dc, previous);
+            if (surface != IntPtr.Zero) DeleteObject(surface);
+            DeleteDC(dc);
+        }
+    }
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterWindowMessage(string text);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder buffer, int max);

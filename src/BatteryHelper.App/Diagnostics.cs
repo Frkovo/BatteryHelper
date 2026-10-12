@@ -14,8 +14,7 @@ internal static class Diagnostics
     public static void CaptureHost(TaskbarHost host, string? output = null)
     {
         if (!host.Visible || !Native.GetWindowRect(host.Handle, out var rect)) return;
-        var center = new System.Drawing.Point((rect.Left + rect.Right) / 2, (rect.Top + rect.Bottom) / 2);
-        if (Native.WindowFromPoint(center) != host.Handle) return;
+        if (!host.HitTestOwnWindow()) return;
         using var bitmap = new System.Drawing.Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top);
         using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
             graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, bitmap.Size);
@@ -34,7 +33,8 @@ internal static class Diagnostics
             WindowVisible = host.Visible, Embedded = parent != IntPtr.Zero && Native.ClassName(parent) is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd",
             ParentClass = Native.ClassName(parent), ParentHandle = parent.ToInt64(),
             ChildStyle = (Native.GetWindowLongPtr(host.Handle, -16).ToInt64() & 0x40000000) != 0,
-            HitTestOwnWindow = host.Handle != IntPtr.Zero && Native.WindowFromPoint(new((rect.Left + rect.Right) / 2, (rect.Top + rect.Bottom) / 2)) == host.Handle,
+            HitTestOwnWindow = host.HitTestOwnWindow(),
+            TransparentBackgroundPassesThrough = host.TransparentBackgroundPassesThrough(),
             host.Generation, host.Reason,
             Rendering = host.RenderState,
             Placement = TaskbarPlacement.State, Lifecycle = lifecycle,

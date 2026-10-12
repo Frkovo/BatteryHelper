@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Drawing.Text;
 using BatteryHelper.Core;
 using Forms = System.Windows.Forms;
@@ -19,7 +20,9 @@ internal sealed class TaskbarHost : IDisposable
     public int Generation { get; private set; }
     public string? Reason { get; private set; }
     public bool Visible => Handle != IntPtr.Zero && Native.IsWindowVisible(Handle);
-    public object RenderState => new { Renderer = "GDI layered child", Width = _canvas?.ClientSize.Width, Height = _canvas?.ClientSize.Height, PaintCount = _canvas?.PaintCount };
+    public object RenderState => new { Renderer = "GDI per-pixel alpha layered child", Width = _canvas?.ClientSize.Width, Height = _canvas?.ClientSize.Height, PaintCount = _canvas?.PaintCount, Surface = _canvas?.Surface };
+    public bool HitTestOwnWindow() => _canvas?.HitTestOwnWindow() == true;
+    public bool TransparentBackgroundPassesThrough() => _canvas?.TransparentBackgroundPassesThrough() == true;
     public void Update(PowerSnapshot snapshot) { View.Update(snapshot); _display = PowerPresentation.From(snapshot); _canvas?.SetDisplay(_display); }
 
     public void Place(PlacementResult placement, bool hidden)
@@ -46,7 +49,7 @@ internal sealed class TaskbarHost : IDisposable
             origin.X, origin.Y, placement.Rect.Width, placement.Rect.Height, 0x10 | 0x40)) {
             Hide(); Reason = "任务栏位置变化，正在重新挂载。"; return;
         }
-        _canvas!.Invalidate(); Reason = null;
+        _canvas!.RefreshSurface(); Reason = null;
     }
     public void Recreate() => DisposeCanvas();
     private void Hide() { if (Handle != IntPtr.Zero && Native.IsWindow(Handle)) Native.ShowWindow(Handle, 0); }
@@ -54,13 +57,14 @@ internal sealed class TaskbarHost : IDisposable
     public void Dispose() => DisposeCanvas();
 }
 
-// Windows 11's taskbar compositor does not present a plain cross-process child
-// reliably. WS_EX_LAYERED gives our embedded GDI surface its own composition layer.
+// Present a premultiplied alpha surface: blank pixels reveal Explorer's taskbar,
+// while text and antialiased edges retain their own opacity.
 internal sealed class PowerCanvas : Forms.Control
 {
     private readonly IntPtr _parent;
     private PowerPresentation _display = PowerPresentation.From(PowerSnapshot.Empty("正在连接采集服务。"));
     public int PaintCount { get; private set; }
+    public Native.AlphaSurface? Surface { get; private set; }
     public PowerCanvas(IntPtr parent, int width, int height)
     {
         _parent = parent; Size = new(width, height); Cursor = Forms.Cursors.Hand;
@@ -78,11 +82,22 @@ internal sealed class PowerCanvas : Forms.Control
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        if (!Native.SetLayeredWindowAttributes(Handle, 0, 255, 2))
-            throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+        RefreshSurface();
     }
-    public void SetDisplay(PowerPresentation display) { _display = display; AccessibleName = $"{display.PrimaryText}，{display.SecondaryText}"; Invalidate(); }
-    protected override void OnPaint(Forms.PaintEventArgs e)
+    public void SetDisplay(PowerPresentation display) { _display = display; AccessibleName = $"{display.PrimaryText}，{display.SecondaryText}"; if (IsHandleCreated) RefreshSurface(); }
+    public bool HitTestOwnWindow() => Surface is { OpaquePixels: > 0 } surface && Native.GetWindowRect(Handle, out var rect) &&
+        Native.WindowFromPoint(new(rect.Left + surface.HitPoint.X, rect.Top + surface.HitPoint.Y)) == Handle;
+    public bool TransparentBackgroundPassesThrough() => Surface is { TransparentPixels: > 0 } && Native.GetWindowRect(Handle, out var rect) &&
+        Native.WindowFromPoint(new(rect.Left + 1, rect.Top + 1)) != Handle;
+    protected override void OnPaint(Forms.PaintEventArgs e) => RefreshSurface();
+    public void RefreshSurface()
+    {
+        if (!IsHandleCreated || IsDisposed || ClientSize.Width < 1 || ClientSize.Height < 1) return;
+        using var bitmap = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
+        using (var graphics = Graphics.FromImage(bitmap)) DrawSurface(graphics);
+        Surface = Native.PresentAlpha(Handle, bitmap);
+    }
+    private void DrawSurface(Graphics graphics)
     {
         PaintCount++;
         var resources = System.Windows.Application.Current.Resources;
@@ -90,8 +105,8 @@ internal sealed class PowerCanvas : Forms.Control
             var color = ((SolidColorBrush)resources[key]).Color;
             return Color.FromArgb(color.A, color.R, color.G, color.B);
         }
-        var graphics = e.Graphics; var foreground = ReadColor("TextBrush");
-        graphics.Clear(ReadColor("BackgroundBrush"));
+        var foreground = ReadColor("TextBrush");
+        graphics.Clear(Color.Transparent);
         var scale = Native.GetDpiForWindow(Handle) / 96f;
         graphics.ScaleTransform(scale > 0 ? scale : 1, scale > 0 ? scale : 1);
         graphics.SmoothingMode = SmoothingMode.AntiAlias;

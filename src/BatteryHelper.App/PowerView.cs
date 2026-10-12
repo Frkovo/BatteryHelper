@@ -22,8 +22,7 @@ internal sealed class PowerView : UserControl
     {
         Width = 220; Height = 44;
         Background = Brushes.Transparent;
-        var panel = new Border { Padding = new Thickness(10, 3, 10, 3) };
-        panel.SetResourceReference(Border.BackgroundProperty, "BackgroundBrush");
+        var panel = new Border { Padding = new Thickness(10, 3, 10, 3), Background = Brushes.Transparent };
         var grid = new Grid(); grid.RowDefinitions.Add(new() { Height = new(22) }); grid.RowDefinitions.Add(new() { Height = new(15) });
         var first = new StackPanel { Orientation = Orientation.Horizontal };
         _icon.SetResourceReference(Shape.StrokeProperty, "TextBrush");

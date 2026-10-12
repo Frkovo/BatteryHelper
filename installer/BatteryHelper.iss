@@ -1,4 +1,4 @@
-#define AppVersion "1.0.2"
+#define AppVersion "1.0.3"
 #define PublishDir "..\artifacts\publish"
 [Setup]
 AppId={{8CB1112D-9CD0-42F9-A1EA-9172447020CC}
@@ -39,8 +39,6 @@ Source: "..\.vendor\lhm\LICENSE"; DestDir: "{app}\licenses"; DestName: "LibreHar
 Name: "{group}\BatteryHelper"; Filename: "{app}\BatteryHelper.exe"
 Name: "{group}\卸载 BatteryHelper"; Filename: "{uninstallexe}"
 [Run]
-Filename: "{app}\BatteryHelper.exe"; Parameters: "--configure-startup on"; Tasks: startup; Check: PowerServiceReady; Flags: runasoriginaluser waituntilterminated runhidden
-Filename: "{app}\BatteryHelper.exe"; Parameters: "--configure-startup off"; Tasks: not startup; Check: PowerServiceReady; Flags: runasoriginaluser waituntilterminated runhidden
 Filename: "{app}\BatteryHelper.exe"; Description: "启动 BatteryHelper"; Check: PowerServiceReady; Flags: nowait postinstall skipifsilent runasoriginaluser
 [UninstallRun]
 Filename: "{app}\BatteryHelper.exe"; Parameters: "--quit"; Flags: runhidden waituntilterminated; RunOnceId: "ClosePowerUi"
@@ -73,6 +71,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  StartupArguments: String;
 begin
   if CurStep = ssPostInstall then begin
     if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
@@ -81,6 +80,16 @@ begin
       RaiseException('无法启动功率采集组件配置程序。');
     if ResultCode <> 0 then
       RaiseException('功率采集组件配置失败。请查看 README 中的安装说明。');
+    if WizardIsTaskSelected('startup') then
+      StartupArguments := '--configure-startup on'
+    else
+      StartupArguments := '--configure-startup off';
+    Log('Configuring BatteryHelper login startup after the power service.');
+    if not ExecAsOriginalUser(ExpandConstant('{app}\BatteryHelper.exe'),
+      StartupArguments, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      RaiseException('无法配置 BatteryHelper 登录启动。');
+    if ResultCode <> 0 then
+      RaiseException('BatteryHelper 登录启动配置失败。');
     ServiceConfigured := True;
   end;
 end;

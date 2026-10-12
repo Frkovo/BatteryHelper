@@ -86,3 +86,17 @@ Win32 子窗口由任务栏承载，但 Windows 11 没有保证其内部窗口�
 44 项自动检查通过。证据包括 `CpuPower.trx`、`cpu-exclusion-probe.jsonl`、`cpu-exclusion-summary.json`、`cpu-exclusion-installed.jsonl` 及 `installed-render-1.0.2.json`。原始记录仅在本地验证目录和源码包内；仓库包含说明与实际任务栏截图。
 
 本轮验证了当前本机负载下的真实读数，未执行额外 GPU 压力测试或重新进行 30 分钟运行测试。其他 CPU/GPU 的包含关系不凭名称推断，未确认的设备保留原始口径说明；独显不会作为核显扣除项。
+
+## 1.0.3 启动与恢复验证（2026-10-12）
+
+此版本改用普通用户登录计划任务及监督进程，并为电源恢复、解锁、Explorer 重建、采集连接和任务栏边界查询增加恢复处理。原因及行为见 [STABILITY.md](STABILITY.md)。
+
+46 项自动检查通过，记录在 `artifacts/validation/StartupRecovery.trx`。任务栏查询辅助进程实际被挂起后，超时机制重建查询，显示恢复且没有遗留待完成查询；记录在 `hung-query-recovery.json`。显示进程被强制结束后，新进程恢复可见，监督任务仍为 Running；记录在 `ui-crash-recovery.json`。随后主动退出，所有显示、监督及查询进程停止，计划任务结果为 0；记录在 `explicit-exit-1.0.3.json`。
+
+最终安装包覆盖更新退出码 0，文件版本为 1.0.3.0，采集服务 Running。安装器在服务配置完成后实际登记并启动正式目录的登录任务；动作是 `C:\Program Files\BatteryHelper\BatteryHelper.exe --supervise`，普通权限、允许电池启动和继续运行、无限运行时长，旧 Run 项已移除。结果见 `installed-stability-summary-1.0.3.json`。
+
+正式安装版本模拟恢复后，挂载代数从 1 增至 2，恢复计数为 1，没有遗留边界查询，读数年龄约 1.14 秒；记录在 `installed-resume-summary-1.0.3.json`。随后挂起本应用的显示进程，监督进程识别无响应并启动新实例，任务继续为 Running，显示恢复可见。主动退出后任务结果为 0，最后恢复不带调试参数的正式启动动作，留下显示、监督及查询三个普通用户进程运行。
+
+已查看正式版本截取的实际任务栏区域图片 `installed-visible-1.0.3.png`，确认充电、CPU 和 GPU 文字可见。本机当前位置为 `(16,1828)–(456,1916)`，尺寸 440×88 物理像素，即 220×44 DIP；父窗口为 Shell_TrayWnd，WS_CHILD 和中心点击命中检查通过。读数随采样变化，图片与相邻诊断快照不要求瞬时数值相同。原始快照和窗口检查见 `installed-render-1.0.3.json`。
+
+本轮没有实际注销、重启或让用户电脑休眠，也没有重新执行 30 分钟界面测试。实际开机登录与物理休眠后的恢复仍需日常使用验收。

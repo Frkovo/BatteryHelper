@@ -1,4 +1,3 @@
-using System.Windows.Automation;
 using System.Collections.Concurrent;
 using BatteryHelper.Core;
 using Forms = System.Windows.Forms;
@@ -11,32 +10,25 @@ internal static class TaskbarPlacement
 {
     private sealed record Occupancy(PixelRect[] Rectangles, DateTimeOffset CapturedAt);
     private static readonly ConcurrentDictionary<long, Occupancy> Cache = new();
-    private static readonly ConcurrentDictionary<long, byte> Queries = new();
-    public static void Invalidate() => Cache.Clear();
+    private static readonly ConcurrentDictionary<long, long> Queries = new();
+    private static readonly OccupancyWorker Worker = new();
+    private static long _generation;
+    public static object State => new { Epoch = _generation, PendingQueries = Queries.Count, CachedTaskbars = Cache.Count, Worker.Restarts };
+    public static void Invalidate() { Interlocked.Increment(ref _generation); Cache.Clear(); Queries.Clear(); Worker.Restart(); }
+    public static void Stop() => Worker.Dispose();
 
     private static void RefreshOccupancy(IntPtr taskbar)
     {
         var key = taskbar.ToInt64();
-        if (!Queries.TryAdd(key, 0)) return;
-        // UI Automation can stall while Explorer is unresponsive. Keep it off the UI thread
-        // and allow only one query at a time; an expired result hides the child safely.
-        _ = Task.Run(() => {
+        var generation = Interlocked.Read(ref _generation);
+        if (!Queries.TryAdd(key, generation)) return;
+        // A stalled UIA provider is terminated in its owned helper process, not left
+        // holding an in-process query gate forever after resume.
+        _ = Task.Run(async () => {
             try {
-                var root = AutomationElement.FromHandle(taskbar);
-                var condition = new OrCondition(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
-                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem),
-                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ToolBar));
-                var children = root.FindAll(TreeScope.Descendants, condition);
-                var occupied = new List<PixelRect>();
-                foreach (AutomationElement child in children) {
-                    var rect = child.Current.BoundingRectangle;
-                    if (child.Current.IsOffscreen || rect.IsEmpty || rect.Width < 1 || rect.Height < 1) continue;
-                    occupied.Add(new((int)Math.Floor(rect.Left), (int)Math.Floor(rect.Top), (int)Math.Ceiling(rect.Right), (int)Math.Ceiling(rect.Bottom)));
-                }
-                Cache[taskbar.ToInt64()] = new(occupied.ToArray(), DateTimeOffset.UtcNow);
-            } catch (Exception error) when (error is ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException) {
-                Cache.TryRemove(taskbar.ToInt64(), out _);
-            } finally { Queries.TryRemove(key, out _); }
+                var occupied = await Worker.Query(taskbar);
+                if (generation == Interlocked.Read(ref _generation)) Cache[key] = new(occupied, DateTimeOffset.UtcNow);
+            } finally { ((ICollection<KeyValuePair<long, long>>)Queries).Remove(new(key, generation)); }
         });
     }
 

@@ -17,6 +17,12 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if ($Action -eq 'Uninstall') {
     if (Test-Path -LiteralPath $taskConfigPath) {
         $taskOwnerSid = (Get-Content -LiteralPath $taskConfigPath -Raw | ConvertFrom-Json).userSid
+        $taskStartupName = 'BatteryHelper-' + $taskOwnerSid
+        $taskStartup = Get-ScheduledTask -TaskName $taskStartupName -ErrorAction SilentlyContinue
+        if ($taskStartup) {
+            $taskStartup | Stop-ScheduledTask -ErrorAction SilentlyContinue
+            $taskStartup | Unregister-ScheduledTask -Confirm:$false
+        }
         $taskRunKey = [Microsoft.Win32.Registry]::Users.OpenSubKey("$taskOwnerSid\Software\Microsoft\Windows\CurrentVersion\Run", $true)
         if ($taskRunKey) {
             try {

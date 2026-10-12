@@ -20,7 +20,7 @@ internal sealed class PowerView : UserControl
 
     public PowerView()
     {
-        Width = 248; Height = 44;
+        Width = 220; Height = 44;
         Background = Brushes.Transparent;
         var panel = new Border { Padding = new Thickness(10, 3, 10, 3) };
         panel.SetResourceReference(Border.BackgroundProperty, "BackgroundBrush");

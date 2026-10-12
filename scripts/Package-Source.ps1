@@ -1,4 +1,4 @@
-param([string]$Output='artifacts\dist\BatteryHelper-Source-1.0.2.zip')
+param([string]$Output='artifacts\dist\BatteryHelper-Source-1.0.3.zip')
 $ErrorActionPreference='Stop'
 $taskRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskDestination=[IO.Path]::GetFullPath((Join-Path $taskRoot $Output))
@@ -34,7 +34,10 @@ try {
         'installed-samples.jsonl','final-status.json','soak\summary.json','soak\samples.jsonl',
         'installed-visible-1.0.1.png','installed-render-1.0.1.json','recreated-visible-1.0.1.png','recreated-render-1.0.1.json',
         'CpuPower.trx','cpu-exclusion-summary.json','cpu-exclusion-probe.jsonl','cpu-exclusion-installed.jsonl',
-        'installed-visible-1.0.2.png','installed-render-1.0.2.json'
+        'installed-visible-1.0.2.png','installed-render-1.0.2.json',
+        'StartupRecovery.trx','hung-query-recovery.json','ui-crash-recovery.json','explicit-exit-1.0.3.json',
+        'installed-stability-summary-1.0.3.json','installed-resume-summary-1.0.3.json',
+        'installed-visible-1.0.3.png','installed-render-1.0.3.json'
     )
     foreach($taskEvidence in $taskEvidencePaths){
         $taskRelative='artifacts\validation\'+$taskEvidence

@@ -11,7 +11,7 @@ internal static class Diagnostics
 {
     // Debug-only pixel check of the application's own visible client rectangle.
     // The normal background sampler does not take screenshots.
-    public static void CaptureHost(TaskbarHost host)
+    public static void CaptureHost(TaskbarHost host, string? output = null)
     {
         if (!host.Visible || !Native.GetWindowRect(host.Handle, out var rect)) return;
         var center = new System.Drawing.Point((rect.Left + rect.Right) / 2, (rect.Top + rect.Bottom) / 2);
@@ -19,15 +19,17 @@ internal static class Diagnostics
         using var bitmap = new System.Drawing.Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top);
         using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
             graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, bitmap.Size);
-        Directory.CreateDirectory(AppSettings.DirectoryPath);
-        bitmap.Save(Path.Combine(AppSettings.DirectoryPath, "taskbar-capture.png"), System.Drawing.Imaging.ImageFormat.Png);
+        output ??= Path.Combine(AppSettings.DirectoryPath, "taskbar-capture.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        bitmap.Save(output, System.Drawing.Imaging.ImageFormat.Png);
     }
-    public static void RuntimeReport(TaskbarHost host, AppSettings settings, PowerSnapshot snapshot, string output)
+    public static void RuntimeReport(TaskbarHost host, AppSettings settings, PowerSnapshot snapshot, string output, object? lifecycle = null)
     {
         Native.GetWindowRect(host.Handle, out var rect);
         var parent = Native.GetParent(host.Handle);
         var state = new {
-            TimeUtc = DateTimeOffset.UtcNow, Administrator = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator),
+            TimeUtc = DateTimeOffset.UtcNow, ProcessId = Environment.ProcessId,
+            Administrator = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator),
             settings.Corner, settings.Visible, settings.HideOnFullscreen, settings.AutoStart,
             WindowVisible = host.Visible, Embedded = parent != IntPtr.Zero && Native.ClassName(parent) is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd",
             ParentClass = Native.ClassName(parent), ParentHandle = parent.ToInt64(),
@@ -35,6 +37,8 @@ internal static class Diagnostics
             HitTestOwnWindow = host.Handle != IntPtr.Zero && Native.WindowFromPoint(new((rect.Left + rect.Right) / 2, (rect.Top + rect.Bottom) / 2)) == host.Handle,
             host.Generation, host.Reason,
             Rendering = host.RenderState,
+            Placement = TaskbarPlacement.State, Lifecycle = lifecycle,
+            Messages = new { Native.StatusMessage, Native.ResumeMessage, Native.CaptureHostMessage, Native.ExitMessage },
             Bounds = new PixelRect(rect.Left, rect.Top, rect.Right, rect.Bottom),
             PrimaryText = host.View.PrimaryText, SecondaryText = host.View.SecondaryText,
             Sample = snapshot
@@ -48,8 +52,8 @@ internal static class Diagnostics
             screen.DeviceName, screen.Primary,
             Bounds = new PixelRect(screen.Bounds.Left, screen.Bounds.Top, screen.Bounds.Right, screen.Bounds.Bottom),
             WorkArea = new PixelRect(screen.WorkingArea.Left, screen.WorkingArea.Top, screen.WorkingArea.Right, screen.WorkingArea.Bottom),
-            Left = TaskbarPlacement.Calculate(screen, Corner.Left, 248, 44),
-            Right = TaskbarPlacement.Calculate(screen, Corner.Right, 248, 44),
+            Left = TaskbarPlacement.Calculate(screen, Corner.Left, 220, 44),
+            Right = TaskbarPlacement.Calculate(screen, Corner.Right, 220, 44),
             ForegroundIsFullscreen = Native.IsFullscreen(screen.Bounds)
         }).ToArray();
         File.WriteAllText(output, JsonSerializer.Serialize(screens, new JsonSerializerOptions { WriteIndented = true }));
